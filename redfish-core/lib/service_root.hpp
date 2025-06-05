@@ -119,6 +119,7 @@ inline void handleServiceRootGet(
     }
 
     handleServiceRootGetImpl(asyncResp);
+    getServiceIdentification(asyncResp);
 }
 
 inline void requestRoutesServiceRoot(App& app)

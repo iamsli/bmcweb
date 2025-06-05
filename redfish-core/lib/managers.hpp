@@ -546,6 +546,55 @@ inline void setDateTime(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
         interactive);
 }
 
+inline void setServiceIdentification(const std::shared_ptr<bmcweb::AsyncResp>& aResp,
+                                     const std::string& serviceidentification)
+{
+    BMCWEB_LOG_DEBUG("Set ServiceIdentification: {}", serviceIdentification);
+    
+    const std::string processName = "xyz.openbmc_project.Settings";
+    const std::string objectPath = "/xyz/openbmc_project/Software/Settings/ServiceIdentification";
+    const std::string assetTagInterface = "xyz.openbmc_project.Inventory.Decorator.AssetTag";
+    const std::string propertyName = "AssetTag";
+    sdbusplus::asio::setProperty(
+        *crow::connections::systemBus, processName,
+        objectPath, assetTagInterface, propertyName, serviceIdentification,
+        // syncResp](const boost::system::error_code&
+        [asyncResp{std::move(asyncResp)}](const boost::system::error_code& ec) {
+            if (ec)
+            {
+                BMCWEB_LOG_DEBUG(
+                    "[Set] ServiceIdentification error: {}",
+                    ec);
+                messages::internalError(asyncResp->res);
+                return;
+            }
+            asyncResp->res.jsonValue["Status"] = "Success";
+    });
+}
+
+inline void getServiceIdentification(
+    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
+{
+    const std::string processName = "xyz.openbmc_project.Settings";
+    const std::string objectPath = "/xyz/openbmc_project/Software/Settings/ServiceIdentification";
+    const std::string assetTagInterface = "xyz.openbmc_project.Inventory.Decorator.AssetTag";
+    const std::string propertyName = "AssetTag";
+
+    sdbusplus::asio::getProperty<std::string>(
+        *crow::connections::systemBus, processName,
+        objectPath, assetTagInterface, propertyName,
+        [asyncResp](const boost::system::error_code ec,
+                    const std::string& serviceIdentification) {
+        if (ec)
+        {
+            BMCWEB_LOG_DEBUG("[Get] ServiceIdentification error: {}",
+                             ec);
+            return;
+        }
+        asyncResp->res.jsonValue["ServiceIdentification"] = serviceIdentification;
+    });
+}
+
 inline void checkForQuiesced(
     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
 {
@@ -888,6 +937,7 @@ inline void requestRoutesManager(App& app)
                 std::optional<nlohmann::json::object_t> fanZones;
                 std::optional<nlohmann::json::object_t> stepwiseControllers;
                 std::optional<std::string> profile;
+                std::optional<std::string> serviceIdentification;
 
                 if (!json_util::readJsonPatch(                            //
                         req, asyncResp->res,                              //
@@ -899,7 +949,8 @@ inline void requestRoutesManager(App& app)
                         "Oem/OpenBmc/Fan/PidControllers", pidControllers, //
                         "Oem/OpenBmc/Fan/Profile", profile,               //
                         "Oem/OpenBmc/Fan/StepwiseControllers",
-                        stepwiseControllers                               //
+                        stepwiseControllers,                               //
+                        "ServiceIdentification", serviceIdentification
                         ))
                 {
                     return;
@@ -914,6 +965,10 @@ inline void requestRoutesManager(App& app)
                 if (datetime)
                 {
                     setDateTime(asyncResp, *datetime);
+                }
+                if (serviceidentification)
+                {
+                    setServiceIdentification(asyncResp, *serviceidentification);
                 }
 
                 RedfishService::getInstance(app).handleSubRoute(req, asyncResp);
